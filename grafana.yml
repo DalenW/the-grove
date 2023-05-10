@@ -1,0 +1,141 @@
+version: '3'
+
+volumes:
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+    
+networks:
+  traefik-public:
+    external: true
+  grafana-net:
+    driver: overlay
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - /etc/prometheus:/etc/prometheus
+      - prometheus-data:/prometheus
+    restart: unless-stopped
+    networks:
+      - grafana-net
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    networks:
+      - traefik-public
+      - grafana-net
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      labels:
+         - traefik.enable=true
+         - traefik.docker.network=traefik-public
+         - traefik.constraint-label=traefik-public
+         - traefik.http.routers.grafana-http.rule=Host(`grafana.home.dalenw.com`)
+         - traefik.http.routers.grafana-http.entrypoints=http
+         - traefik.http.routers.grafana-http.middlewares=https-redirect
+         - traefik.http.routers.grafana-https.rule=Host(`grafana.home.dalenw.com`)
+         - traefik.http.routers.grafana-https.entrypoints=https
+         - traefik.http.routers.grafana-https.tls=true
+         - traefik.http.routers.grafana-https.tls.certresolver=le
+         - traefik.http.services.grafana.loadbalancer.server.port=3000
+         
+  node_exporter:
+    image: quay.io/prometheus/node-exporter:latest
+    container_name: node_exporter
+    pid: host
+    restart: always
+    networks:
+      - grafana-net
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+      - /:/host:ro,rslave
+    command: 
+      - '--path.rootfs=/host'
+      - '--path.procfs=/host/proc' 
+      - '--path.sysfs=/host/sys'
+      - --collector.filesystem.ignored-mount-points
+      - "^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers|rootfs/var/lib/docker/overlay2|rootfs/run/docker/netns|rootfs/var/lib/docker/aufs)($$|/)"
+    deploy:
+      mode: global
+      resources:
+        limits:
+          memory: 128M
+      placement:
+        constraints:
+          - node.platform.os == linux
+
+  cadvisor-amd:
+    image: gcr.io/cadvisor/cadvisor
+    container_name: cadvisor-amd
+    ports:
+      - "8081:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+    restart: always
+    networks:
+      - grafana-net
+    deploy:
+      mode: global
+      resources:
+        limits:
+          memory: 128M
+      placement:
+        constraints:
+          - node.platform.os == linux
+          - node.labels.architecture == amd64
+  
+  cadvisor-arm:
+    image: braingamer/cadvisor-arm
+    container_name: cadvisor-arm
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+    restart: always
+    networks:
+      - grafana-net
+    deploy:
+      mode: global
+      resources:
+        limits:
+          memory: 128M
+      placement:
+        constraints:
+          - node.platform.os == linux
+          - node.labels.architecture == arm64

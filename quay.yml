@@ -1,0 +1,48 @@
+version: '3.3'
+
+services:
+  config:
+    command: config secret
+    image: quay.io/projectquay/quay:latest
+    ports:
+      - 2045:8080
+    networks:
+      - quay-net
+      - traefik-public
+    volumes:
+      - app_config:/conf/stack
+    deploy:
+      placement:
+        constraints:
+          - node.role == worker
+          - node.hostname == orangepi-1
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik-public
+        - traefik.constraint-label=traefik-public
+        - traefik.http.routers.quay-http.rule=Host(`quay.home.dalenw.com`)
+        - traefik.http.routers.quay-http.entrypoints=http
+        - traefik.http.routers.quay-http.middlewares=https-redirect
+        - traefik.http.routers.quay-https.rule=Host(`quay.home.dalenw.com`)
+        - traefik.http.routers.quay-https.entrypoints=https
+        - traefik.http.routers.quay-https.tls=true
+        - traefik.http.routers.quay-https.tls.certresolver=le
+        - traefik.http.services.quay.loadbalancer.server.port=2045
+
+volumes:
+  app_storage:
+    driver: local
+  app_config:
+    driver: local
+  app_log:
+    driver: local
+  app_tmp:
+    driver: local
+  clair_config:
+    driver: local
+
+networks:
+  traefik-public:
+    external: true
+  quay-net:
+    driver: overlay

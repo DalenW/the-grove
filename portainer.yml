@@ -1,0 +1,62 @@
+version: '3.3'
+
+services:
+  agent:
+    image: portainer/agent
+    environment:
+      AGENT_CLUSTER_ADDR: tasks.agent
+      DOMAIN: portainer.home.dalenw.com
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/volumes:/var/lib/docker/volumes
+    networks:
+      - agent-network
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.platform.os == linux
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    command: -H tcp://tasks.agent:9001 --tlsskipverify
+    volumes:
+      - portainer-data:/data
+    networks:
+      - agent-network
+      - traefik-public
+    environment:
+      DOMAIN: portainer.home.dalenw.com
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+          - node.labels.portainer.portainer-data == true
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik-public
+        - traefik.constraint-label=traefik-public
+        - traefik.http.routers.portainer-http.rule=Host(`portainer.home.dalenw.com`)
+        - traefik.http.routers.portainer-http.entrypoints=http
+        - traefik.http.routers.portainer-http.middlewares=https-redirect
+        - traefik.http.routers.portainer-https.rule=Host(`portainer.home.dalenw.com`)
+        - traefik.http.routers.portainer-https.entrypoints=https
+        - traefik.http.routers.portainer-https.tls=true
+        - traefik.http.routers.portainer-https.tls.certresolver=le
+        - traefik.http.services.portainer.loadbalancer.server.port=9000
+
+networks:
+  agent-network:
+    attachable: true
+  traefik-public:
+    external: true
+
+volumes:
+  portainer-data:
+
+
+# docker pull portainer/portainer-ce:latest
+# docker service update --image portainer/portainer-ce:latest --publish-add 9443:9443 --force portainer_portainer
+
+# docker pull portainer/agent:latest
+# docker service update --image portainer/agent:latest --force portainer_agent 

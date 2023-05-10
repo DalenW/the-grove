@@ -1,0 +1,54 @@
+version: "3.4"
+
+services:
+  mongo:
+    image: mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+    networks:
+      - recipe-buddy-network
+    volumes:
+      - mongo_db:/data/db
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == orangepi-6
+
+  backend:
+    image: ghcr.io/georgegebbett/recipe-buddy-backend:latest
+    networks:
+      - recipe-buddy-network
+    depends_on:
+      - "mongo"
+
+  frontend:
+    image: ghcr.io/georgegebbett/recipe-buddy-frontend:latest
+    depends_on:
+      - "backend"
+    networks:
+      - recipe-buddy-network
+      - traefik-public
+    deploy:
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik-public
+        - traefik.constraint-label=traefik-public
+        - traefik.http.routers.recipes-http.rule=Host(`recipes.home.dalenw.com`)
+        - traefik.http.routers.recipes-http.entrypoints=http
+        - traefik.http.routers.recipes-http.middlewares=https-redirect
+        - traefik.http.routers.recipes-https.rule=Host(`recipes.home.dalenw.com`)
+        - traefik.http.routers.recipes-https.entrypoints=https
+        - traefik.http.routers.recipes-https.tls=true
+        - traefik.http.routers.recipes-https.tls.certresolver=le
+        - traefik.http.services.recipes.loadbalancer.server.port=80
+
+networks:
+  recipe-buddy-network:
+    driver: overlay
+  traefik-public:
+    external: true
+
+volumes:
+  mongo_db:

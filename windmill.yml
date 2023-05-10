@@ -1,0 +1,118 @@
+version: "3.7"
+
+services:
+  db:
+    image: postgres:14
+    restart: unless-stopped
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - windmill-network
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: windmill
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == orangepi-4
+
+  windmill_server:
+    image: ghcr.io/windmill-labs/windmill:main
+    restart: unless-stopped
+    networks:
+      - windmill-network
+      - traefik-public
+    environment:
+      - DATABASE_URL=postgres://postgres:${DB_PASSWORD}@db/windmill?sslmode=disable
+      - BASE_URL=http://windmill.home.dalenw.com
+      - RUST_LOG=info
+      ## You can set the number of workers to > 0 and not need any separate worker service
+      - NUM_WORKERS=0
+      - DISABLE_SERVER=false
+      - METRICS_ADDR=false
+    depends_on:
+      - db
+    deploy:
+      placement:
+        constraints:
+          - node.role == worker
+          - node.hostname == orangepi-4
+      replicas: 1
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik-public
+        - traefik.constraint-label=traefik-public
+        - traefik.http.routers.windmill-server-http.rule=Host(`windmill.home.dalenw.com`)
+        - traefik.http.routers.windmill-server-http.entrypoints=http
+        - traefik.http.routers.windmill-server-http.middlewares=https-redirect
+        - traefik.http.routers.windmill-server-https.rule=Host(`windmill.home.dalenw.com`)
+        - traefik.http.routers.windmill-server-https.entrypoints=https
+        - traefik.http.routers.windmill-server-https.tls=true
+        - traefik.http.routers.windmill-server-https.tls.certresolver=le
+        - traefik.http.services.windmill-server.loadbalancer.server.port=8000
+    # volumes:
+    # - ./oauth.json/:/usr/src/app/oauth.json
+
+  windmill_worker:
+    image: ghcr.io/windmill-labs/windmill:main
+    deploy:
+      replicas: 3
+      placement:
+        constraints:
+          - node.role == worker
+    restart: unless-stopped
+    networks:
+      - windmill-network
+    environment:
+      - DATABASE_URL=postgres://postgres:${DB_PASSWORD}@db/windmill?sslmode=disable
+      - BASE_URL=http://windmill.home.dalenw.com
+      - BASE_INTERNAL_URL=http://windmill_server:8000
+      - RUST_LOG=info
+      - NUM_WORKERS=1
+      - DISABLE_SERVER=true
+      - KEEP_JOB_DIR=false
+      - DENO_PATH=/usr/bin/deno
+      - PYTHON_PATH=/usr/local/bin/python3
+      - METRICS_ADDR=false
+    depends_on:
+      - db
+      - windmill_server
+    # to mount the worker folder to debug,, KEEP_JOB_DIR=true and mount /tmp/windmill
+    volumes:
+      - worker_dependency_cache:/tmp/windmill/cache
+
+  lsp:
+    image: ghcr.io/windmill-labs/windmill-lsp:latest
+    restart: unless-stopped
+    networks:
+      - windmill-network
+      - traefik-public
+    deploy:
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik-public
+        - traefik.constraint-label=traefik-public
+        - traefik.http.routers.windmill-lsp-http.rule=Host(`windmill.home.dalenw.com`) && Path(`/ws`)
+        - traefik.http.routers.windmill-lsp-http.entrypoints=http
+        - traefik.http.routers.windmill-lsp-http.middlewares=https-redirect
+        - traefik.http.routers.windmill-lsp-https.rule=Host(`windmill.home.dalenw.com`) && Path(`/ws`)
+        - traefik.http.routers.windmill-lsp-https.entrypoints=https
+        - traefik.http.routers.windmill-lsp-https.tls=true
+        - traefik.http.routers.windmill-lsp-https.tls.certresolver=le
+        - traefik.http.services.windmill-lsp.loadbalancer.server.port=3001
+
+volumes:
+  db_data:
+    driver: local
+  worker_dependency_cache: null
+
+networks:
+  windmill-network:
+    driver: overlay
+  traefik-public:
+    external: true

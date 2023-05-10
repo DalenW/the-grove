@@ -1,0 +1,97 @@
+version: "3"
+
+services:
+  vanilla:
+    image: itzg/minecraft-server
+    tty: true
+    stdin_open: true
+    restart: unless-stopped
+    volumes:
+      - vanilla:/data
+    depends_on:
+      - router
+    networks:
+      - minecraft-network
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.hostname == orangepi-2
+      labels:
+        - mc-router.host=minecraft.home.dalenw.com
+    environment:
+      EULA: "TRUE"
+      MOTD: "Dalen's Minecraft Server"
+      DIFFICULTY: normal
+      OPS: "Regis_DeVallis"
+      VIEW_DISTANCE: 10
+      LEVEL: world
+      MAX_MEMORY: 4G
+      MAX_PLAYERS: 10
+      VANILLATWEAKS_SHARECODE: ZRTxaw
+  
+  private:
+    image: itzg/minecraft-server
+    tty: true
+    stdin_open: true
+    restart: unless-stopped
+    volumes:
+      - private:/data
+    depends_on:
+      - router
+    networks:
+      - minecraft-network
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.hostname == orangepi-3
+      labels:
+        - mc-router.host=private-mc.home.dalenw.com
+    environment:
+      EULA: "TRUE"
+      MOTD: "Dalen Only"
+      DIFFICULTY: normal
+      OPS: "Regis_DeVallis"
+      WHITELIST: "Regis_DeVallis"
+      VIEW_DISTANCE: 20
+      LEVEL: world
+      MAX_MEMORY: 4G
+      MAX_PLAYERS: 3
+      VANILLATWEAKS_SHARECODE: ZRTxaw,lmwISi
+  
+  router:
+    image: itzg/mc-router
+    command: --in-docker-swarm
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - minecraft-network
+      - traefik-public
+    deploy:
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik-public
+        - traefik.constraint-label=traefik-public
+        - traefik.tcp.services.minecraft-service.loadbalancer.server.port=25565
+        - traefik.tcp.routers.minecraft-router.tls=false
+        - traefik.tcp.routers.minecraft-router.rule=HostSNI(`*`)
+        - traefik.tcp.routers.minecraft-router.service=minecraft-service
+        - traefik.tcp.routers.minecraft-router.tls.passthrough=true
+      placement:
+        constraints:
+          - node.role == manager
+
+networks:
+  minecraft-network:
+    driver: overlay
+  traefik-public:
+    external: true
+
+volumes:
+  vanilla:
+    driver: local
+  private:
+    driver: local

@@ -1,0 +1,50 @@
+version: "3"
+
+services:
+  frontend:
+    image: grocy/frontend:v3.3.2
+    depends_on:
+      - backend
+    networks:
+      - grocy-network
+      - traefik-public
+    tmpfs:
+      - /tmp
+    restart: unless-stopped
+    deploy:
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik-public
+        - traefik.constraint-label=traefik-public
+        - traefik.http.routers.grocy-http.rule=Host(`grocy.home.dalenw.com`,`grocy.dalenw.com`)
+        - traefik.http.routers.grocy-http.entrypoints=http
+        - traefik.http.routers.grocy-http.middlewares=https-redirect
+        - traefik.http.routers.grocy-https.rule=Host(`grocy.home.dalenw.com`,`grocy.dalenw.com`)
+        - traefik.http.routers.grocy-https.entrypoints=https
+        - traefik.http.routers.grocy-https.tls=true
+        - traefik.http.routers.grocy-https.tls.certresolver=le
+        - traefik.http.services.grocy.loadbalancer.server.port=8080
+
+  backend:
+    image: grocy/backend:v3.3.2
+    networks:
+      - grocy-network
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - app-db:/var/www/data
+    restart: unless-stopped
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == orangepi-6
+
+networks:
+  grocy-network:
+    driver: overlay
+  traefik-public:
+    external: true
+
+volumes:
+  app-db:
