@@ -1,0 +1,65 @@
+version: '3.7'
+
+services:
+  cells:
+    image: pydio/cells:latest
+    restart: unless-stopped
+    networks:
+      - pydio-network
+      - traefik-public
+    volumes:
+      - cellsdir:/var/cells
+      - data:/var/cells/data
+    depends_on:
+      - db
+    environment:
+      CELLS_SITE_NO_TLS: 1
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik-public
+        - traefik.constraint-label=traefik-public
+        - traefik.http.routers.pydio-server-http.rule=Host(`pydio.home.dalenw.com`,`pydio.dalenw.com`)
+        - traefik.http.routers.pydio-server-http.entrypoints=http
+        - traefik.http.routers.pydio-server-http.middlewares=https-redirect
+        - traefik.http.routers.pydio-server-https.rule=Host(`pydio.home.dalenw.com`,`pydio.dalenw.com`)
+        - traefik.http.routers.pydio-server-https.entrypoints=https
+        - traefik.http.routers.pydio-server-https.tls=true
+        - traefik.http.routers.pydio-server-https.tls.certresolver=le
+        - traefik.http.services.pydio-server.loadbalancer.server.port=8080
+
+  db:
+    image: mysql:8
+    restart: unless-stopped
+    networks:
+      - pydio-network
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: cells
+      MYSQL_USER: pydio
+      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    command: [mysqld, --character-set-server=utf8mb4, --collation-server=utf8mb4_unicode_ci]
+    volumes:
+      - db_data:/var/lib/mysql
+    deploy:
+      placement:
+        constraints:
+          - node.role == worker
+          - node.hostname == orangepi-5
+
+volumes:
+    data:
+      driver: local
+    cellsdir:
+      driver: local
+    db_data:
+      driver: local
+
+networks:
+  pydio-network:
+    driver: overlay
+  traefik-public:
+    external: true
