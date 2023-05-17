@@ -1,0 +1,37 @@
+version: "3.3"
+
+services:
+  homepage:
+    image: ghcr.io/benphelps/homepage:latest
+    volumes:
+      - config:/app/config # Make sure your local config directory exists
+      - /var/run/docker.sock:/var/run/docker.sock:ro # (optional) For docker integrations
+    networks:
+    - traefik-public
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == orangepi-2
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik-public
+        - traefik.constraint-label=traefik-public
+
+        - traefik.http.routers.homepage-http.rule=Host(`services.home.dalenw.com`)
+        - traefik.http.routers.homepage-http.entrypoints=http
+        - traefik.http.routers.homepage-http.middlewares=https-redirect
+
+        - traefik.http.routers.homepage-https.rule=Host(`services.home.dalenw.com`)
+        - traefik.http.routers.homepage-https.entrypoints=https
+        - traefik.http.routers.homepage-https.tls=true
+        - traefik.http.routers.homepage-https.tls.certresolver=le
+        
+        - traefik.http.services.homepage.loadbalancer.server.port=3000
+
+volumes:
+  config:
+    driver: local
+
+networks:
+  traefik-public:
+    external: true
