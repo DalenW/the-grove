@@ -1,0 +1,201 @@
+version: "3.9" # needs to stay 3.9 for secrets
+
+x-template-app: &template-app
+  image: minio/minio:RELEASE.2023-05-04T21-44-30Z
+  networks:
+    - minio_distributed
+    - traefik-public
+  command: server http://minio{1...4}/export --console-address ":9001"
+  environment:
+    - MINIO_DISTRIBUTED_MODE_ENABLED=yes
+    - MINIO_DISTRIBUTED_NODES=minio1,minio2,minio3,minio4
+    - MINIO_PROMETHEUS_AUTH_TYPE=public
+    - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+    - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+  secrets:
+    - minio_secret_key
+    - minio_access_key
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+    interval: 30s
+    timeout: 20s
+    retries: 3
+  # no this doesn't get duplicated across templates
+  deploy:
+    restart_policy:
+      delay: 10s
+      max_attempts: 10
+      window: 60s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-public
+      - traefik.constraint-label=traefik-public
+
+      # API
+      - traefik.http.routers.minio-api-http.rule=Host(`minio.home.dalenw.com`)
+      - traefik.http.routers.minio-api-http.entrypoints=http
+      - traefik.http.routers.minio-api-http.middlewares=https-redirect
+
+      - traefik.http.routers.minio-api-https.rule=Host(`minio.home.dalenw.com`)
+      - traefik.http.routers.minio-api-https.entrypoints=https
+      - traefik.http.routers.minio-api-https.tls=true
+      - traefik.http.routers.minio-api-https.tls.certresolver=le
+      
+      - traefik.http.services.minio-api.loadbalancer.server.port=9000
+
+      # Console
+      - traefik.http.routers.minio-mc-http.rule=Host(`minioconsole.home.dalenw.com`,`minio.dalenw.com`)
+      - traefik.http.routers.minio-mc-http.entrypoints=http
+      - traefik.http.routers.minio-mc-http.middlewares=https-redirect
+
+      - traefik.http.routers.minio-mc-https.rule=Host(`minioconsole.home.dalenw.com`,`minio.dalenw.com`)
+      - traefik.http.routers.minio-mc-https.entrypoints=https
+      - traefik.http.routers.minio-mc-https.tls=true
+      - traefik.http.routers.minio-mc-https.tls.certresolver=le
+      
+      - traefik.http.services.minio-mc.loadbalancer.server.port=9001
+
+
+
+services:
+  minio1:
+    <<: *template-app
+    hostname: minio1
+    volumes:
+      - minio1-data:/export
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == orangepi-1
+      restart_policy:
+        delay: 10s
+        max_attempts: 10
+        window: 60s
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik-public
+        - traefik.constraint-label=traefik-public
+
+        # Console
+        - traefik.http.routers.minio-mc-http.rule=Host(`minio-mc.home.dalenw.com`,`minio.dalenw.com`)
+        - traefik.http.routers.minio-mc-http.entrypoints=http
+        - traefik.http.routers.minio-mc-http.middlewares=https-redirect
+
+        - traefik.http.routers.minio-mc-https.rule=Host(`minio-mc.home.dalenw.com`,`minio.dalenw.com`)
+        - traefik.http.routers.minio-mc-https.entrypoints=https
+        - traefik.http.routers.minio-mc-https.tls=true
+        - traefik.http.routers.minio-mc-https.tls.certresolver=le
+
+        - traefik.http.services.minio-mc.loadbalancer.server.port=9001
+
+  minio2:
+    <<: *template-app
+    hostname: minio2
+    volumes:
+      - minio2-data:/export
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == orangepi-2
+      restart_policy:
+        delay: 10s
+        max_attempts: 10
+        window: 60s
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik-public
+        - traefik.constraint-label=traefik-public
+
+        # API
+        - traefik.http.routers.minio-api-http.rule=Host(`minio.home.dalenw.com`)
+        - traefik.http.routers.minio-api-http.entrypoints=http
+        - traefik.http.routers.minio-api-http.middlewares=https-redirect
+
+        - traefik.http.routers.minio-api-https.rule=Host(`minio.home.dalenw.com`)
+        - traefik.http.routers.minio-api-https.entrypoints=https
+        - traefik.http.routers.minio-api-https.tls=true
+        - traefik.http.routers.minio-api-https.tls.certresolver=le
+        
+        - traefik.http.services.minio-api.loadbalancer.server.port=9000
+
+  minio3:
+    <<: *template-app
+    hostname: minio3
+    volumes:
+      - minio3-data:/export
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == orangepi-3
+      restart_policy:
+        delay: 10s
+        max_attempts: 10
+        window: 60s
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik-public
+        - traefik.constraint-label=traefik-public
+
+        # API
+        - traefik.http.routers.minio-api-http.rule=Host(`minio.home.dalenw.com`)
+        - traefik.http.routers.minio-api-http.entrypoints=http
+        - traefik.http.routers.minio-api-http.middlewares=https-redirect
+
+        - traefik.http.routers.minio-api-https.rule=Host(`minio.home.dalenw.com`)
+        - traefik.http.routers.minio-api-https.entrypoints=https
+        - traefik.http.routers.minio-api-https.tls=true
+        - traefik.http.routers.minio-api-https.tls.certresolver=le
+        
+        - traefik.http.services.minio-api.loadbalancer.server.port=9000
+
+  minio4:
+    <<: *template-app
+    hostname: minio4
+    volumes:
+      - minio4-data:/export
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == orangepi-4
+      restart_policy:
+        delay: 10s
+        max_attempts: 10
+        window: 60s
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik-public
+        - traefik.constraint-label=traefik-public
+
+        # API
+        - traefik.http.routers.minio-api-http.rule=Host(`minio.home.dalenw.com`)
+        - traefik.http.routers.minio-api-http.entrypoints=http
+        - traefik.http.routers.minio-api-http.middlewares=https-redirect
+
+        - traefik.http.routers.minio-api-https.rule=Host(`minio.home.dalenw.com`)
+        - traefik.http.routers.minio-api-https.entrypoints=https
+        - traefik.http.routers.minio-api-https.tls=true
+        - traefik.http.routers.minio-api-https.tls.certresolver=le
+        
+        - traefik.http.services.minio-api.loadbalancer.server.port=9000
+
+volumes:
+  minio1-data:
+    driver: local
+  minio2-data:
+    driver: local
+  minio3-data:
+    driver: local
+  minio4-data:
+    driver: local
+
+networks:
+  minio_distributed:
+    driver: overlay
+  traefik-public:
+    external: true
+
+secrets:
+  minio_secret_key:
+    external: true
+  minio_access_key:
+    external: true
