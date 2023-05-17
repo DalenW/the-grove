@@ -5,6 +5,7 @@ services:
     image: ghcr.io/benphelps/homepage:latest
     volumes:
       - config:/app/config # Make sure your local config directory exists
+      - /var/run/docker.sock:/var/run/docker.sock:ro # Mounted as read-only
     networks:
       - traefik-public
       - homepage-network
