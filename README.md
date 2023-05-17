@@ -1,2 +1,2 @@
-# home-network-compose
+# The Grove
 Home network compose files
