@@ -1,26 +1,6 @@
-version: "3.7"
+version: "3"
 
 services:
-  db:
-    image: postgres:14
-    restart: unless-stopped
-    volumes:
-      - db_data:/var/lib/postgresql/data
-    networks:
-      - windmill-network
-    environment:
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: windmill
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    deploy:
-      placement:
-        constraints:
-          - node.hostname == orangepi-4
-
   windmill_server:
     image: ghcr.io/windmill-labs/windmill:main
     restart: unless-stopped
@@ -29,7 +9,7 @@ services:
       - traefik-public
     environment:
       - DATABASE_URL=postgres://postgres:${DB_PASSWORD}@db/windmill?sslmode=disable
-      - BASE_URL=http://windmill.home.dalenw.com
+      - BASE_URL=http://windmill.dalenw.com
       - RUST_LOG=info
       ## You can set the number of workers to > 0 and not need any separate worker service
       - NUM_WORKERS=0
@@ -70,7 +50,7 @@ services:
       - windmill-network
     environment:
       - DATABASE_URL=postgres://postgres:${DB_PASSWORD}@db/windmill?sslmode=disable
-      - BASE_URL=http://windmill.home.dalenw.com
+      - BASE_URL=http://windmill.dalenw.com
       - BASE_INTERNAL_URL=http://windmill_server:8000
       - RUST_LOG=info
       - NUM_WORKERS=1
@@ -105,6 +85,26 @@ services:
         - traefik.http.routers.windmill-lsp-https.tls=true
         - traefik.http.routers.windmill-lsp-https.tls.certresolver=le
         - traefik.http.services.windmill-lsp.loadbalancer.server.port=3001
+
+  db:
+    image: postgres:14
+    restart: unless-stopped
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - windmill-network
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: windmill
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == orangepi-4
 
 volumes:
   db_data:
