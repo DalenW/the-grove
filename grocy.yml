@@ -24,6 +24,11 @@ services:
         - traefik.http.routers.grocy-https.tls=true
         - traefik.http.routers.grocy-https.tls.certresolver=le
         - traefik.http.services.grocy.loadbalancer.server.port=8080
+    labels:
+      - homepage.group=Services
+      - homepage.name=Grocy
+      - homepage.href=https://grocy.dalenw.com
+      - homepage.description=Kitchen ERP
 
   backend:
     image: grocy/backend:v3.3.2

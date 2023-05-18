@@ -3,9 +3,10 @@ version: "3.3"
 services:
   homepage:
     image: ghcr.io/benphelps/homepage:latest
+    container_name: homepage
     volumes:
       - config:/app/config # Make sure your local config directory exists
-      - /var/run/docker.sock:/var/run/docker.sock:ro # Mounted as read-only
+      # - /var/run/docker.sock:/var/run/docker.sock:ro # Mounted as read-only
     networks:
       - traefik-public
       - homepage-network
@@ -31,6 +32,7 @@ services:
   
   dockerproxy:
     image: ghcr.io/tecnativa/docker-socket-proxy:latest
+    # container_name: dockerproxy
     networks:
       - homepage-network
     environment:
