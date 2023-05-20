@@ -1,2 +1,3 @@
 hompage _configs/services.yaml
 .DS_Store
+grafana/prometheus.yml

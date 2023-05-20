@@ -11,19 +11,20 @@ networks:
     external: true
   grafana-net:
     driver: overlay
+  prometheus-net:
+    external: true
 
 services:
-  prometheus:
+  prometheus: # port 9090
     image: prom/prometheus:latest
     container_name: prometheus
-    ports:
-      - "9090:9090"
     volumes:
       - /etc/prometheus:/etc/prometheus
       - prometheus-data:/prometheus
     restart: unless-stopped
     networks:
       - grafana-net
+      - prometheus-net
     deploy:
       placement:
         constraints:
@@ -33,9 +34,6 @@ services:
 
   grafana:
     image: grafana/grafana:latest
-    container_name: grafana
-    ports:
-      - "3000:3000"
     volumes:
       - grafana-data:/var/lib/grafana
     restart: unless-stopped
@@ -44,7 +42,11 @@ services:
     networks:
       - traefik-public
       - grafana-net
+    environment:
+      PROMETHEUS_ENDPOINT: http://prometheus:9090
     deploy:
+      mode: replicated
+      replicas: 1
       placement:
         constraints:
           - node.role == manager
@@ -68,17 +70,28 @@ services:
     restart: always
     networks:
       - grafana-net
+    environment:
+      NODE_ID: {{.Node.ID}}
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /:/rootfs:ro
       - /:/host:ro,rslave
+      - /etc/hostname:/etc/nodename
     command: 
       - '--path.rootfs=/host'
       - '--path.procfs=/host/proc' 
       - '--path.sysfs=/host/sys'
       - --collector.filesystem.ignored-mount-points
       - "^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers|rootfs/var/lib/docker/overlay2|rootfs/run/docker/netns|rootfs/var/lib/docker/aufs)($$|/)"
+
+      # - '--path.rootfs=/host'
+      # - '--path.procfs=/host/proc' 
+      # - '--path.sysfs=/host/sys'
+      # - '--collector.filesystem.ignored-mount-points'
+      # - '--collector.textfile.directory=/etc/node-exporter/'
+      # - "^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers|rootfs/var/lib/docker/overlay2|rootfs/run/docker/netns|rootfs/var/lib/docker/aufs)($$|/)"
+      # - '--no-collector.ipvs'
     deploy:
       mode: global
       resources:
@@ -88,11 +101,9 @@ services:
         constraints:
           - node.platform.os == linux
 
-  cadvisor-amd:
+  cadvisor-amd: # port 8080
     image: gcr.io/cadvisor/cadvisor
-    container_name: cadvisor-amd
-    ports:
-      - "8081:8080"
+    command: -logtostderr -docker_only
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
@@ -114,11 +125,9 @@ services:
           - node.platform.os == linux
           - node.labels.architecture == amd64
   
-  cadvisor-arm:
+  cadvisor-arm: # port 8080
     image: braingamer/cadvisor-arm
-    container_name: cadvisor-arm
-    ports:
-      - "8080:8080"
+    command: -logtostderr -docker_only
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:rw
@@ -139,3 +148,5 @@ services:
         constraints:
           - node.platform.os == linux
           - node.labels.architecture == arm64
+  
+  # alertmanager: # port 9093
