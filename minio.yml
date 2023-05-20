@@ -64,6 +64,11 @@ services:
     hostname: minio1
     volumes:
       - minio1-data:/export
+    networks:
+      - minio-distributed
+      - traefik-public
+      - prometheus-net
+      - minio-net
     deploy:
       placement:
         constraints:
@@ -222,6 +227,8 @@ networks:
   traefik-public:
     external: true
   prometheus-net:
+    external: true
+  minio-net: # for other containers to access minio
     external: true
 
 secrets:

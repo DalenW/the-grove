@@ -12,13 +12,12 @@ services:
       REDIS_HOST: redis
       REDIS_HOST_PASSWORD: ${REDIS_HOST_PASSWORD}
 
-      # OBJECTSTORE_S3_HOST: minio.home.dalenw.com
+      # OBJECTSTORE_S3_HOST: minio1
       # OBJECTSTORE_S3_BUCKET: nextcloud
       # OBJECTSTORE_S3_KEY: ${OBJECTSTORE_S3_KEY}
       # OBJECTSTORE_S3_SECRET: ${OBJECTSTORE_S3_SECRET}
-      # OBJECTSTORE_S3_SSL: "true"
-      # OBJECTSTORE_S3_REGION: us-east-1
-      # OBJECTSTORE_S3_PORT: 443
+      # OBJECTSTORE_S3_SSL: "false"
+      # OBJECTSTORE_S3_PORT: 9000
 
       NEXTCLOUD_TRUSTED_DOMAINS: "nextcloud.dalenw.com"
     restart: unless-stopped
